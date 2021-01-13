@@ -1,0 +1,52 @@
+# 1. Import a GitHub PR into Gerrit
+#
+# copybara copy.bara.sky github-pr <PR number>
+#
+# 3. Mirror from googlesource to GitHub
+
+github_url = "https://github.com/cuelang/cue.git"
+gerrit_url = "https://cue-review.googlesource.com/cue"
+
+origin_github_pr = git.github_pr_origin(
+        baseline_from_branch = True,
+        use_merge = True,
+        url = github_url,
+        )
+
+origin_gerrit = git.origin(
+        url = gerrit_url,
+        ref = "master",
+        )
+
+destination_gerrit = git.gerrit_destination(
+        url = gerrit_url,
+        fetch = "master",
+        push_to_refs_for = "master%hashtag=github-pr",
+        # push_to_refs_for = "master%cc=reviews@cuelang.org,hashtag=github-pr",
+        )
+
+# Migration for exporting the cue Gerrit repo to the public Github repo
+git.mirror(
+        name = "github",
+        origin = gerrit_url,
+        destination = github_url,
+        refspecs = ["refs/*"],
+        prune = False,
+        )
+
+# Workflow used for importing PRs from Github into Gerrit
+core.workflow(
+        name = "github-pr",
+        origin = origin_github_pr,
+        destination = destination_gerrit,
+        authoring = authoring.pass_thru("CUE team <no-reply@google.com>"),
+        transformations = [
+            metadata.replace_message(
+                "${GITHUB_PR_TITLE}\n\n" +
+                "${GITHUB_PR_BODY}\n\n" +
+                "Closes #${GITHUB_PR_NUMBER}\n" +
+                "https://github.com/cuelang/cue/pull/${GITHUB_PR_NUMBER}",
+                ),
+            ],
+        mode = "CHANGE_REQUEST",
+        )
